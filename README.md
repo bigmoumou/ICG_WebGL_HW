@@ -24,4 +24,16 @@ Demo code of Interactive Computer Graphics 2018 Fall (ICG)
     // // rotate on both x and y-axis together:
     // mat4.rotate(mvMatrix, degToRad(teapotAngle), [1, 1, 0]);
 ```
-  
+- Translation:    
+```javascript
+    // position of z decrease 40 
+    mat4.translate(mvMatrix, [0, 0, -40]);
+    // // position of x increase 10 and y decrease 20;
+    // mat4.translate(mvMatrix, [10, -20, 0]);
+```
+- Scaling:    
+```javascript
+```
+- Shearing:    
+```javascript
+```
