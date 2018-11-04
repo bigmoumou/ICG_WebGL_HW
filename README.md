@@ -39,6 +39,8 @@ Demo code of Interactive Computer Graphics 2018 Fall (ICG)
     mat4.scale(mvMatrix, [2, 1, 1])
 ```
 - Shearing:    
+<img src="https://i.imgur.com/edcyh5d.png" width="300">    
+
 ```javascript
     var shearMatrix = mat4.create();
     mat4.identity(shearMatrix);
