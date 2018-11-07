@@ -332,7 +332,7 @@
     var teapotAngle = 180;
 
 
-    function drawScene(x_trans, clear) {
+    function drawScene(trans, rots, clear) {
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
         
         if (clear) {
@@ -347,9 +347,9 @@
 
         mat4.identity(mvMatrix);
 
-        mat4.translate(mvMatrix, [x_trans, 0, -70]);
+        mat4.translate(mvMatrix, trans);
 
-        mat4.rotate(mvMatrix, degToRad(teapotAngle), [0, 1, 0]);
+        mat4.rotate(mvMatrix, degToRad(teapotAngle), rots);
 
         // mat4.scale(mvMatrix, [1, 1, 1])
 
@@ -407,11 +407,11 @@
         requestAnimFrame(tick);
 
         setShadeMode();
-        drawScene(0, 1);
+        drawScene([0, 0, -70], [0, 1, 0], 1);
         setOtherMode(2)
-        drawScene(20, 0);
+        drawScene([25, 0, -70], [1, 0, 0], 0);
         setOtherMode(0)
-        drawScene(-20, 0);
+        drawScene([-25, 0, -70], [0, 1, 1], 0);
         animate();
     }
 
@@ -442,8 +442,8 @@
 
     <select id="setShadeMode">
         <option value="0">flat</option>
-        <option value="1">gourand</option>
-        <option value="2" selected="selected">phong</option>
+        <option value="1" selected="selected">gourand</option>
+        <option value="2">phong</option>
     </select>
 
 </body>
