@@ -49,12 +49,9 @@ Demo code of Interactive Computer Graphics 2018 Fall (ICG)
     mat4.identity(shearMatrix);
     // on X-axis
     shearMatrix[1] = 0.5
-    shearMatrix[2] = 0.5
     // // on Y-axis
     // shearMatrix[4] = 0.5
-    // shearMatrix[6] = 0.5
     // // on Z-axis
     // shearMatrix[8] = 0.5
-    // shearMatrix[9] = 0.5
     mat4.multiply(mvMatrix, shearMatrix, mvMatrix);
 ```
