@@ -1,0 +1,451 @@
+<html>
+
+<head>
+<title>ICG WebGL &mdash; HW1</title>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+<script type="text/javascript" src="webgl-utils.js"></script>
+
+<script id="fragmentShader" type="fragment">
+    #extension GL_OES_standard_derivatives : enable
+    precision mediump float;
+
+    varying vec3 normalInterp;
+    varying vec3 vertPos;
+    varying vec2 aTCoord;
+
+    uniform highp sampler2D uSampler;
+    uniform highp int shade_mode;
+
+    varying vec4 color;
+
+    highp float Ka = 1.0;   // Ambient reflection coefficient
+    highp float Kd = 1.0;   // Diffuse reflection coefficient
+    highp float Ks = 1.0;   // Specular reflection coefficient
+    highp float shininessVal = 200.0; // Shininess
+    // Material color
+    highp vec3 ambientColor = vec3(0.1, 0.1, 0.1);
+    highp vec3 diffuseColor = vec3(0.25, 0.25, 0.25);
+    highp vec3 specularColor = vec3(2.0, 2.0, 2.0);
+    // highp vec3 lightPos = vec3(0.0, 0.0, 1.0); // Light position
+    highp mat3 lightPos = mat3(100.0, 0.0, 0.0,
+                               0.0, 100.0, 0.0, 
+                               0.0, 0.0, 100.0);
+
+    void main(void) {
+
+        vec3 N;
+        if (shade_mode == 0) {
+            N = normalize(cross(dFdx(vertPos), dFdy(vertPos)));
+        } else if (shade_mode == 1) {
+            gl_FragColor = color;
+            return;
+        } else if (shade_mode == 2) {
+            N = normalize(normalInterp);
+        }
+
+
+        vec4 tmp;
+        vec3 L;
+        float lambertian;
+        float specular;
+        for (int i=0; i < 3; i++) {
+
+            L = normalize(lightPos[i] - vertPos);
+            // Lambert's cosine law
+            lambertian = max(dot(N, L), 0.0);
+            specular = 0.0;
+            if(lambertian > 0.0) {
+                vec3 R = reflect(-L, N);      // Reflected light vector
+                vec3 V = normalize(-vertPos); // Vector to viewer
+                // Compute the specular term
+                float specAngle = max(dot(R, V), 0.0);
+                specular = pow(specAngle, shininessVal);
+            }
+
+        tmp += vec4(Ka * ambientColor + Kd * lambertian * diffuseColor + Ks * specular * specularColor, 1.0);
+
+        }
+
+        vec4 fragmentColor = texture2D(uSampler, vec2(aTCoord.s, aTCoord.t));
+
+        gl_FragColor = tmp * fragmentColor;
+    }
+</script>
+
+<script id="vertexShader" type="vertex">
+    attribute vec3 aVertexPosition;
+    attribute vec3 normal;
+    attribute vec2 aTextureCoord;
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    uniform mat4 normalMat;
+    uniform highp int shade_mode;
+    uniform highp sampler2D uSampler;
+
+    varying vec3 normalInterp;
+    varying vec3 vertPos;
+    varying vec2 aTCoord;
+
+    highp float Ka = 1.0;   // Ambient reflection coefficient
+    highp float Kd = 1.0;   // Diffuse reflection coefficient
+    highp float Ks = 1.0;   // Specular reflection coefficient
+    highp float shininessVal = 200.0; // Shininess
+    // Material color
+    highp vec3 ambientColor = vec3(0.1, 0.1, 0.1);
+    highp vec3 diffuseColor = vec3(0.25, 0.25, 0.25);
+    highp vec3 specularColor = vec3(2.0, 2.0, 2.0);
+    highp mat3 lightPos = mat3(100.0, 0.0, 0.0,
+                               0.0, 100.0, 0.0, 
+                               0.0, 0.0, 100.0);
+    
+    varying vec4 color;
+
+    void main(void) {
+        aTCoord = aTextureCoord;
+
+        vec4 vertPos4 = uMVMatrix * vec4(aVertexPosition, 1.0);
+        vertPos = vec3(vertPos4) / vertPos4.w;
+        normalInterp = vec3(normalMat * vec4(normal, 0.0));
+        gl_Position = uPMatrix * vertPos4;
+
+
+        if (shade_mode == 1) {
+            vec4 tmp;
+            vec3 L;
+            vec3 N = normalize(normalInterp);
+            float lambertian;
+            float specular;
+            for (int i=0; i < 3; i++) {
+
+                L = normalize(lightPos[i] - vertPos);
+                // Lambert's cosine law
+                lambertian = max(dot(N, L), 0.0);
+                specular = 0.0;
+                if(lambertian > 0.0) {
+                    vec3 R = reflect(-L, N);      // Reflected light vector
+                    vec3 V = normalize(-vertPos); // Vector to viewer
+                    // Compute the specular term
+                    float specAngle = max(dot(R, V), 0.0);
+                    specular = pow(specAngle, shininessVal);
+                }
+
+                tmp += vec4(Ka * ambientColor +
+                            Kd * lambertian * diffuseColor +
+                            Ks * specular * specularColor, 1.0);
+
+            }
+
+            vec4 fragmentColor;
+            fragmentColor = texture2D(uSampler, vec2(aTextureCoord.s, aTextureCoord.t));
+
+            color = tmp * fragmentColor;
+        }
+
+
+    }
+</script>
+
+
+<script type="text/javascript">
+
+    var gl;
+
+    function initGL(canvas) {
+        try {
+            gl = canvas.getContext("experimental-webgl");
+            gl.viewportWidth = canvas.width;
+            gl.viewportHeight = canvas.height;
+        } catch (e) {
+        }
+        if (!gl) {
+            alert("Could not initialise WebGL, sorry :-(");
+        }
+        if (!gl.getExtension('OES_standard_derivatives')) {
+            throw 'extension not support';
+        }
+    }
+
+
+    function getShader(gl, id) {
+        var shaderScript = document.getElementById(id);
+        if (!shaderScript) {
+            return null;
+        }
+
+        var str = "";
+        var k = shaderScript.firstChild;
+        while (k) {
+            if (k.nodeType == 3) {
+                str += k.textContent;
+            }
+            k = k.nextSibling;
+        }
+
+        var shader;
+        if (shaderScript.type == "fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (shaderScript.type == "vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    }
+
+
+    var shaderProgram;
+
+    function initShaders() {
+        var fragmentShader = getShader(gl, "fragmentShader");
+        var vertexShader = getShader(gl, "vertexShader");
+
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+
+        gl.useProgram(shaderProgram);
+
+        shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+        gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+        
+        shaderProgram.textureCoordAttribute = gl.getAttribLocation(shaderProgram, "aTextureCoord");
+        gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+
+        // normal
+        shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "normal");
+        gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);        
+
+
+        shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+        shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+        shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "uSampler");
+
+
+        shaderProgram.shadeMode = gl.getUniformLocation(shaderProgram, "shade_mode");
+
+        // normal
+        shaderProgram.nMatrixUniform = gl.getUniformLocation(shaderProgram, "normalMat");
+    }
+
+
+    function handleLoadedTexture(texture) {
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+        gl.generateMipmap(gl.TEXTURE_2D);
+
+        gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+
+    var galvanizedTexture;
+
+    function initTextures() {
+        galvanizedTexture = gl.createTexture();
+        galvanizedTexture.image = new Image();
+        galvanizedTexture.image.onload = function () {
+            handleLoadedTexture(galvanizedTexture)
+        }
+        galvanizedTexture.image.src = "galvanizedTexture.jpg";   // galvanizedTexture
+    }
+
+
+    var mvMatrix = mat4.create();
+    var pMatrix = mat4.create();
+    var nMatrix = mat4.create();
+    var shade_mode = 2;
+
+    function setMatrixUniforms() {
+        gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+        gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+        gl.uniformMatrix4fv(shaderProgram.nMatrixUniform, false, nMatrix);
+    }
+
+    function degToRad(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+
+    var teapotVertexPositionBuffer;
+    var teapotVertexNormalBuffer;
+    var teapotVertexTextureCoordBuffer;
+    var teapotVertexIndexBuffer;
+
+    function handleLoadedTeapot(teapotData) {
+        teapotVertexNormalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexNormals), gl.STATIC_DRAW);
+        teapotVertexNormalBuffer.itemSize = 3;
+        teapotVertexNormalBuffer.numItems = teapotData.vertexNormals.length / 3;
+
+        teapotVertexTextureCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexTextureCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexTextureCoords), gl.STATIC_DRAW);
+        teapotVertexTextureCoordBuffer.itemSize = 2;
+        teapotVertexTextureCoordBuffer.numItems = teapotData.vertexTextureCoords.length / 2;
+
+        teapotVertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexPositions), gl.STATIC_DRAW);
+        teapotVertexPositionBuffer.itemSize = 3;
+        teapotVertexPositionBuffer.numItems = teapotData.vertexPositions.length / 3;
+
+        teapotVertexIndexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, teapotVertexIndexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(teapotData.indices), gl.STATIC_DRAW);
+        teapotVertexIndexBuffer.itemSize = 1;
+        teapotVertexIndexBuffer.numItems = teapotData.indices.length;
+    }
+
+
+    function loadTeapot() {
+        var request = new XMLHttpRequest();
+        request.open("GET", "Teapot.json");
+        request.onreadystatechange = function () {
+            if (request.readyState == 4) {
+                handleLoadedTeapot(JSON.parse(request.responseText));
+            }
+        }
+        request.send();
+    }
+
+
+    var teapotAngle = 180;
+
+
+    function drawScene(x_trans, clear) {
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        
+        if (clear) {
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);    
+        } 
+
+        if (teapotVertexPositionBuffer == null || teapotVertexNormalBuffer == null || teapotVertexTextureCoordBuffer == null || teapotVertexIndexBuffer == null) {
+            return;
+        }
+
+        mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+
+        mat4.identity(mvMatrix);
+
+        mat4.translate(mvMatrix, [x_trans, 0, -70]);
+
+        mat4.rotate(mvMatrix, degToRad(teapotAngle), [0, 1, 0]);
+
+        // mat4.scale(mvMatrix, [1, 1, 1])
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, galvanizedTexture);
+        
+        gl.uniform1i(shaderProgram.samplerUniform, 0);
+
+        gl.uniform1i(shaderProgram.shadeMode, shade_mode);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, teapotVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+
+
+        // normal
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, teapotVertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexTextureCoordBuffer);
+        gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, teapotVertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 0, 0);
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, teapotVertexIndexBuffer);
+        
+        setMatrixUniforms();
+
+        // normal
+        nMatrix = mat4.inverse(mvMatrix);
+        nMatrix = mat4.transpose(nMatrix);
+
+        gl.drawElements(gl.TRIANGLES, teapotVertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+    }
+
+
+    var lastTime = 0;
+    function animate() {
+        var timeNow = new Date().getTime();
+        if (lastTime != 0) {
+            var elapsed = timeNow - lastTime;
+            teapotAngle += 0.03 * elapsed;
+        }
+        lastTime = timeNow;
+    }
+
+
+    function setShadeMode() {
+        var e = document.getElementById("setShadeMode");
+        shade_mode = e.options[e.selectedIndex].value;       
+    }
+
+    function setOtherMode(m) {
+        shade_mode = m;
+    }
+
+    function tick() {
+        requestAnimFrame(tick);
+
+        setShadeMode();
+        drawScene(0, 1);
+        setOtherMode(2)
+        drawScene(20, 0);
+        setOtherMode(0)
+        drawScene(-20, 0);
+        animate();
+    }
+
+
+    function webGLStart() {
+        var canvas = document.getElementById("ICG-canvas");
+        initGL(canvas);
+        initShaders();
+        initTextures();
+        loadTeapot();
+
+        gl.clearColor(0.0, 0.2, 0.2, 1.0);
+        gl.enable(gl.DEPTH_TEST);
+
+        tick();
+    }
+
+
+</script>
+
+</head>
+
+
+<body onload="webGLStart();">
+  
+    <canvas id="ICG-canvas" style="border: none;" width="800" height="600"></canvas>
+    <br/>
+
+    <select id="setShadeMode">
+        <option value="0">flat</option>
+        <option value="1">gourand</option>
+        <option value="2" selected="selected">phong</option>
+    </select>
+
+</body>
+
+</html>
